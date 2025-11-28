@@ -1,82 +1,71 @@
 import java.util.*;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class NQueen{
     Scanner input = new Scanner(System.in);
 
     private static int N;
-    private static String[][] Board;
+    private List<String[][]> solutions = Collections.synchronizedList(new ArrayList<>());
+    private Semaphore threadSemaphore;
+    private int currentRow = 0;
+    private AtomicBoolean solutionFound = new AtomicBoolean(false);
+
+
     NQueen (int N){
         this.N = N;
-        Board = new String[N][N];
-        for(int i = 0 ; i<N ; i++)
-        {
-            for(int j = 0 ; j<N ; j++)
-            {
-                Board[i][j] = "0";
-            }
+//    Board = new String[N][N];
+//    for(int i = 0 ; i<N ; i++)
+//        {
+//        for(int j = 0 ; j<N ; j++)
+//            {
+//                Board[i][j] = "0";
+//            }
+//        System.out.println();
+//        }
+    }
+    public static void PrintBoard(String[][] board) {
+        for (String[] row : board) {
+            for (String cell : row) System.out.print(cell + " ");
             System.out.println();
         }
     }
-    public static void PrintBoard()
-    {
-        for(int i = 0 ; i<N ; i++)
-        {
-            for(int j = 0 ; j<N ; j++)
-            {
-                System.out.format(Board[i][j] + " ");
-            }
-            System.out.println();
-        }
-    }
-    public static boolean IsSafe(String[][] board , int col , int row )
-    {
-        // check left of the row 3shan yt2kd en row mfhosh "Q"
-        // hysht8l left l2n asln mafesh right f hsht8l 3la al abl bs
-        for(int i = col-1 ; i >= 0 ; i--)
-        {
 
-            if(board[row][i].equals("Q"))
-            {
-                return false;
-            }
-        }
-        // check left of the column 3shan yt2kd en column mfhosh "Q"
-        // hysht8l left l2n asln mafesh right f hsht8l 3la al abl bs
-        for(int Row = row-1 ; Row >= 0 ; Row--)
-        {
-
-            if(board[Row][col].equals("Q"))
-            {
+    public static boolean IsSafe(String[][] board, int row, int col) {
+        // Check left of the row
+        for(int i = col-1; i >= 0; i--) {
+            if(board[row][i].equals("Q")) {
                 return false;
             }
         }
 
-        // check Left upper diagonal
-        int r = row;
-        int c = col;
-        while (r >= 0 && c >= 0)
-        {
-            if(board[r][c].equals("Q"))
-            {
+        // Check above of the column
+        for(int r = row-1; r >= 0; r--) {
+            if(board[r][col].equals("Q")) {
                 return false;
             }
-            r--;
-            c--;
         }
 
-        // check Left Lower diagonal
-        int R = row;
-        int C = col;
-        while(C >= 0 && R < N)
-        {
-            if(board[R][C].equals("Q"))
-            {
+        // Check left upper diagonal
+        int r1 = row-1;
+        int c1 = col-1;
+        while(r1 >= 0 && c1 >= 0) {
+            if(board[r1][c1].equals("Q")) {
                 return false;
             }
-            System.out.println("Row is" + r);
-            System.out.println("col is" + r);
-            R++;
-            C--;
+            r1--;
+            c1--;
+        }
+
+        // Check left lower diagonal
+        int r2 = row+1;
+        int c2 = col-1;
+        while(r2 < N && c2 >= 0) {
+            if(board[r2][c2].equals("Q")) {
+                return false;
+            }
+            r2++;
+            c2--;
         }
 
         return true;
@@ -120,69 +109,132 @@ public class NQueen{
 
 
 
-    public boolean backtrackingSolver(String[][] board, int col, int threadID) {
+    public void backtrackingSolve(String[][] board, int col, int threadId) {
+        if (solutionFound.get()) return;
 
         if (col >= N) {
-            System.out.println("\nThread " + threadID + " found a solution:");
-//            PrintBoard();
-            return true;
+            String[][] sol = new String[N][N];
+            for (int i = 0; i < N; i++) sol[i] = board[i].clone();
+            solutions.add(sol);
+            solutionFound.set(true);
+            return;
         }
 
         for (int row = 0; row < N; row++) {
+            if (solutionFound.get()) return;
             if (IsSafe(board, row, col)) {
                 board[row][col] = "Q";
-
-                if (backtrackingSolver(board, col + 1, threadID)) return true;
-
+                backtrackingSolve(board, col + 1, threadId);
                 board[row][col] = "0";
             }
         }
-        return false;
     }
 
-
     class Worker extends Thread {
-        int startCol;
+        int threadId;
+        private boolean working = true;
 
-        Worker(int col) { this.startCol = col; }
+        Worker(int id) {
+            this.threadId = id;
+        }
 
+        @Override
         public void run() {
-            String[][] board = new String[N][N];
-            for (int i = 0; i < N; i++)
-                Arrays.fill(board[i], "0");
+            System.out.println("Thread " + threadId + " started");
 
-            board[0][startCol] = "Q";
-            System.out.println("Thread starting at column " + startCol);
-            backtrackingSolver(board, 1, startCol);
+            while (working) {
+                try {
+                    threadSemaphore.acquire();
+
+                    int rowToProcess = -1;
+                    synchronized (NQueen.this) {
+                        if (solutionFound.get() || currentRow >= N) {
+                            working = false;
+                            threadSemaphore.release();
+                            break;
+                        }
+                        rowToProcess = currentRow++;
+
+                    }
+
+
+                    if (rowToProcess != -1) {
+                        String[][] board = new String[N][N];
+                        for (int i = 0; i < N; i++) Arrays.fill(board[i], "0");
+
+                        board[rowToProcess][0] = "Q";
+                        System.out.println("Thread " + threadId + " exploring: Queen at (" + rowToProcess + ",0)");
+                        backtrackingSolve(board, 1, threadId);
+                        System.out.println("Thread " + threadId + " finished row " + rowToProcess);
+                    }
+
+                    threadSemaphore.release();
+                    Thread.sleep(10);
+
+                } catch (InterruptedException e) {
+                    System.out.println("Thread " + threadId + " interrupted");
+                    working = false;
+                }
+            }
+            System.out.println("Thread " + threadId + " finished all work!");
+        }
+
+        public void stopWorker() {
+            this.working = false;
         }
     }
 
+    public void startMultiThreaded() {
+        int processors = Runtime.getRuntime().availableProcessors();
+        System.out.println("Available processors: " + processors);
+
+        int numThreads = Math.min(processors, N);
+        threadSemaphore = new Semaphore(numThreads);
+        System.out.println("Creating " + numThreads + " threads with Semaphore control");
+
+        Thread[] workers = new Thread[numThreads];
+        for (int i = 0; i < numThreads; i++) {
+            workers[i] = new Worker(i);
+            workers[i].start();
+        }
+
+        for (Thread t : workers) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                System.out.println("Main thread interrupted");
+            }
+        }
+
+        System.out.println("\n=== FINAL RESULTS ===");
+        System.out.println("All threads finished.");
+
+//        int count = 1;
+//        for (String[][] sol : solutions) {
+//            System.out.println("Solution " + count++ + ":");
+//            PrintBoard(sol);
+//            System.out.println();
+//        }
+        String[][] firstSolution = solutions.get(0);
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                System.out.print(firstSolution[i][j] + " ");
+            }
+            System.out.println();
+        }
+    }
 
 }
-
-
-
-
-
-
-void main() {
-    Scanner input = new Scanner(System.in);
-    System.out.print("Enter number of queens: ");
-    int n = input.nextInt();
-
-    NQueen queen = new NQueen(n);
-
-    Thread[] workers = new Thread[n];
-
-    for (int i = 0; i < n; i++) {
-        workers[i] = queen.new Worker(i);
-        workers[i].start();
+void main(String[] args) {
+    Scanner sc = new Scanner(System.in);
+    System.out.print("Enter number of Queens: ");
+    int N = sc.nextInt();
+    if (N < 4) {
+        System.out.println("N must be >= 4");
+        return;
     }
-
-    for (Thread t : workers) {
-        try { t.join(); } catch (Exception e) {}
-    }
-
-    System.out.println("All threads finished.");
+    NQueen game = new NQueen(N);
+    game.startMultiThreaded();
+    sc.close();
 }
 
