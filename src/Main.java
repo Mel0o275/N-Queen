@@ -9,6 +9,7 @@ public class NQueen{
     private List<String[][]> solutions = Collections.synchronizedList(new ArrayList<>());
     private Semaphore threadSemaphore;
     private int currentRow = 0;
+    // 3l4an lma kol thread y3ml update kolo y4of fe nfs el w2t
     private AtomicBoolean solutionFound = new AtomicBoolean(false);
 
 
@@ -147,6 +148,7 @@ public class NQueen{
                     threadSemaphore.acquire();
 
                     int rowToProcess = -1;
+                    //to prevent Race Condition
                     synchronized (NQueen.this) {
                         if (solutionFound.get() || currentRow >= N) {
                             working = false;
@@ -185,19 +187,21 @@ public class NQueen{
     }
 
     public void startMultiThreaded() {
+        //get my available number of processes
         int processors = Runtime.getRuntime().availableProcessors();
         System.out.println("Available processors: " + processors);
-
+        //to optimize number of threads
         int numThreads = Math.min(processors, N);
+        //create a Semaphore that controls how many threads are allowed to run at the same time
         threadSemaphore = new Semaphore(numThreads);
         System.out.println("Creating " + numThreads + " threads with Semaphore control");
-
+        //create many worker threads as i specified and starts them.
         Thread[] workers = new Thread[numThreads];
         for (int i = 0; i < numThreads; i++) {
             workers[i] = new Worker(i);
             workers[i].start();
         }
-
+        // bygm3 kol el threads w yshof l2a el 7l wla l2
         for (Thread t : workers) {
             try {
                 t.join();
@@ -215,6 +219,7 @@ public class NQueen{
 //            PrintBoard(sol);
 //            System.out.println();
 //        }
+        // print first solution
         String[][] firstSolution = solutions.get(0);
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
