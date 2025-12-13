@@ -17,7 +17,7 @@ public class nqueen {
     private AtomicBoolean solutionFound = new AtomicBoolean(false);
 
     // Callbacks for GUI updates
-    private Consumer<String[][]> onSolutionFound = null;
+    private java.util.function.BiConsumer<Integer, String[][]> onSolutionFound = null;
     private Consumer<String> onStatusUpdate = null;
     private Consumer<Integer> onThreadProgress = null;
     // Callback for step-by-step board updates per thread
@@ -38,7 +38,7 @@ public class nqueen {
     }
 
     // Set callbacks for GUI updates
-    public void setOnSolutionFound(Consumer<String[][]> callback) {
+    public void setOnSolutionFound(java.util.function.BiConsumer<Integer, String[][]> callback) {
         this.onSolutionFound = callback;
     }
 
@@ -150,13 +150,13 @@ public class nqueen {
             for (int i = 0; i < N; i++) sol[i] = board[i].clone();
             solutions.add(sol);
             solutionFound.set(true);
-            // Notify GUI of solution found
+            // Notify GUI of solution found with threadId
             if (onSolutionFound != null) {
                 try {
-                    Platform.runLater(() -> onSolutionFound.accept(sol));
+                    Platform.runLater(() -> onSolutionFound.accept(threadId, sol));
                 } catch (IllegalStateException e) {
                     // JavaFX not initialized, call directly
-                    onSolutionFound.accept(sol);
+                    onSolutionFound.accept(threadId, sol);
                 }
             }
             return;
@@ -344,4 +344,3 @@ public class nqueen {
     }
 
 }
-

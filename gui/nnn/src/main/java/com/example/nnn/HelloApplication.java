@@ -1,5 +1,6 @@
 package com.example.nnn;
 
+import com.example.nnn.nqueen;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -29,7 +30,9 @@ public class HelloApplication extends Application {
     private FlowPane threadBoardsFlowPane;
     private java.util.Map<Integer, GridPane> threadBoardGrids = new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.Map<Integer, Label> threadLabels = new java.util.concurrent.ConcurrentHashMap<>();
+    private java.util.Map<Integer, VBox> threadBoardBoxes = new java.util.concurrent.ConcurrentHashMap<>();
     private int numThreads = 0;
+    private Integer solutionThreadId = null;
 
     @Override
     public void start(Stage primaryStage) {
@@ -76,7 +79,7 @@ public class HelloApplication extends Application {
         threadBoardsFlowPane.setAlignment(Pos.CENTER);
         threadBoardsFlowPane.setPadding(new Insets(10));
         threadBoardsFlowPane.setPrefWrapLength(800);
-        
+
         threadBoardsContainer = new VBox();
         threadBoardsContainer.getChildren().add(threadBoardsFlowPane);
         threadBoardsContainer.setAlignment(Pos.TOP_CENTER);
@@ -128,6 +131,8 @@ public class HelloApplication extends Application {
         }
         threadBoardGrids.clear();
         threadLabels.clear();
+        threadBoardBoxes.clear();
+        solutionThreadId = null;
     }
 
     private void createThreadBoard(int threadId, int n) {
@@ -172,6 +177,7 @@ public class HelloApplication extends Application {
             }
 
             threadBoardGrids.put(threadId, threadGrid);
+            threadBoardBoxes.put(threadId, threadBoardBox);
             threadBoardBox.getChildren().addAll(threadLabel, threadGrid);
             if (threadBoardsFlowPane != null) {
                 threadBoardsFlowPane.getChildren().add(threadBoardBox);
@@ -207,8 +213,8 @@ public class HelloApplication extends Application {
                     // Add queen if present
                     if (board[row][col].equals("Q")) {
                         Circle queen = new Circle(cellSize * 0.3);
-                        queen.setFill(Color.RED);
-                        queen.setStroke(Color.DARKRED);
+                        queen.setFill(Color.BLACK);
+                        queen.setStroke(Color.BLACK);
                         queen.setStrokeWidth(2);
                         cell.getChildren().add(queen);
                     }
@@ -226,16 +232,24 @@ public class HelloApplication extends Application {
         });
     }
 
-    private void updateBoard(String[][] solution) {
-        // This method is kept for compatibility but solution is now shown in thread boards
-        // Mark the thread that found the solution
+    private void updateBoard(int threadId, String[][] solution) {
+        // Mark the thread that found the solution with green background
         Platform.runLater(() -> {
-            // Find which thread found the solution (we'll mark all active threads)
-            for (Integer threadId : threadBoardGrids.keySet()) {
+            // Only mark the first thread that finds the solution
+            if (solutionThreadId == null) {
+                solutionThreadId = threadId;
+
+                // Set green background for the thread that found the solution
+                VBox threadBoardBox = threadBoardBoxes.get(threadId);
+                if (threadBoardBox != null) {
+                    threadBoardBox.setStyle("-fx-background-color: #90EE90; -fx-border-color: #2ecc71; -fx-border-width: 3; -fx-border-radius: 5;");
+                }
+
+                // Update the label
                 Label threadLabel = threadLabels.get(threadId);
                 if (threadLabel != null) {
                     threadLabel.setText("Thread " + threadId + " (Solution Found!)");
-                    threadLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                    threadLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
                 }
             }
         });
@@ -269,9 +283,9 @@ public class HelloApplication extends Application {
             statusArea.appendText("Will create " + numThreads + " threads.\n");
 
             // Set up callbacks
-            nQueenSolver.setOnSolutionFound(solution -> {
-                updateBoard(solution);
-                statusArea.appendText("\n✓ SOLUTION FOUND!\n");
+            nQueenSolver.setOnSolutionFound((threadId, solution) -> {
+                updateBoard(threadId, solution);
+                statusArea.appendText("\n✓ SOLUTION FOUND by Thread " + threadId + "!\n");
                 statusArea.appendText("Displaying the solution on the thread boards.\n");
             });
 
@@ -348,4 +362,3 @@ public class HelloApplication extends Application {
         launch(args);
     }
 }
-
